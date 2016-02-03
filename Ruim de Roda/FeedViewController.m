@@ -15,10 +15,13 @@
 #import "DetailViewController.h"
 #import "UserManager.h"
 #import "TabBarViewController.h"
+#import "Reachability.h"
+#import "InappropriateViewController.h"
 
-
-
-@interface FeedViewController ()
+@interface FeedViewController () <UIActionSheetDelegate> {
+    Reachability *internetReachableFoo;
+    NSString *reportSelected;
+}
 
 @end
 
@@ -28,59 +31,9 @@
     return YES;
 }
 
--(void)viewDidAppear:(BOOL)animated {
-    [super viewDidAppear:NO];
-    [self becomeFirstResponder];
-    [[UIApplication sharedApplication] setStatusBarHidden:NO];
-}
-
--(void)viewWillDisappear:(BOOL)animated {
-    [super viewWillDisappear:NO];
-}
-
--(void)viewDidDisappear:(BOOL)animated {
-    [self resignFirstResponder];
-    [super viewDidDisappear:NO];
-}
-
--(void)motionBegan:(UIEventSubtype)motion withEvent:(UIEvent *)event
-{
-    if (motion == UIEventSubtypeMotionShake )
-    {
-        [self.tabBarController setSelectedIndex:1];
-    }
-}
-
-- (void) loadByPushNotification {
-    
-    TabBarViewController * tabBarController = (TabBarViewController*)self.tabBarController;
-    
-    if (tabBarController.report) {
-       
-        
-        UIStoryboard *storyboard = [UIStoryboard storyboardWithName:@"Main" bundle:nil];
-        DetailViewController *vc = [storyboard instantiateViewControllerWithIdentifier:@"DetailViewController"];
-        vc.report = tabBarController.report;
-        [self.navigationController pushViewController:vc animated:YES];
-        
-        
-       // [self.tableView reloadData];
-       // tabBarController.report = nil;
-    }
-}
-
-
--(void)motionEnded:(UIEventSubtype)motion withEvent:(UIEvent *)event
-{
-    if (motion == UIEventSubtypeMotionShake )
-    {
-
-    }
-}
-
 - (void)viewDidLoad {
     [super viewDidLoad];
-
+    
     self.navigationItem.titleView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"logo-header"]];
     
     self.tableView.separatorColor = [UIColor clearColor];
@@ -90,7 +43,7 @@
     [self.tableView addSubview:refreshControl];
     
     UserManager *userManager = [[UserManager alloc] init];
-
+    
     if (![userManager getUserDefaults]) {
         [userManager createUser:^(NSString *objectID, NSError *error) {
             if (!error) {
@@ -108,16 +61,86 @@
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-
+    
+    [self testInternetConnection];
     [self loadData:nil];
+}
+-(void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:NO];
+    [self becomeFirstResponder];
+    [[UIApplication sharedApplication] setStatusBarHidden:NO];
+}
+
+-(void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:NO];
+}
+
+-(void)viewDidDisappear:(BOOL)animated {
+    [self resignFirstResponder];
+    [super viewDidDisappear:NO];
+}
+
+-(void)motionBegan:(UIEventSubtype)motion withEvent:(UIEvent *)event {
+    if (motion == UIEventSubtypeMotionShake ) {
+        [self.tabBarController setSelectedIndex:1];
+    }
+}
+
+- (void) loadByPushNotification {
+    TabBarViewController * tabBarController = (TabBarViewController*)self.tabBarController;
+    
+    if (tabBarController.report) {
+        UIStoryboard *storyboard = [UIStoryboard storyboardWithName:@"Main" bundle:nil];
+        DetailViewController *vc = [storyboard instantiateViewControllerWithIdentifier:@"DetailViewController"];
+        vc.report = tabBarController.report;
+        [self.navigationController pushViewController:vc animated:YES];
+       // [self.tableView reloadData];
+       // tabBarController.report = nil;
+    }
+}
+
+-(void)motionEnded:(UIEventSubtype)motion withEvent:(UIEvent *)event {
+    if (motion == UIEventSubtypeMotionShake ) {
+    }
+}
+
+- (void)testInternetConnection {
+    __weak typeof(self) weakSelf = self;
+
+    internetReachableFoo = [Reachability reachabilityWithHostname:@"www.google.com"];
+    
+    // Internet is reachable
+    internetReachableFoo.reachableBlock = ^(Reachability*reach) {
+        // Update the UI on the main thread
+        dispatch_async(dispatch_get_main_queue(), ^{
+//            weakSelf.tableView.hidden = NO;
+//            weakSelf.internetAlert.hidden = YES;
+        });
+    };
+    
+    // Internet is not reachable
+    internetReachableFoo.unreachableBlock = ^(Reachability*reach) {
+        // Update the UI on the main thread
+        dispatch_async(dispatch_get_main_queue(), ^{
+//            [weakSelf.tableView setHidden:NO];
+//            weakSelf.tableView.hidden = YES;
+//            weakSelf.internetAlert.hidden = NO;
+            [weakSelf alertWithTitle:@"Ops!" message:@"Você não esta conectado na internet."];
+        });
+    };
+
+    [internetReachableFoo startNotifier];
+}
+
+- (void)alertWithTitle:(NSString *)_alertTitle message:(NSString *)_alertMessage {
+    UIAlertView *alert = [[UIAlertView alloc] initWithTitle:_alertTitle message:_alertMessage delegate:nil cancelButtonTitle:@"OK" otherButtonTitles:nil];
+    [alert show];
 }
 
 - (void)loadData:(UIRefreshControl *)refreshControl {
     ReportManager *reportManager = [[ReportManager alloc] init];
     [reportManager requestReports:^(NSArray *resultReports, NSError *error) {
-        
         if (resultReports) {
-            
             _arrayReports = [resultReports mutableCopy];
             [self performSelectorOnMainThread:@selector(updateTableView:) withObject:refreshControl waitUntilDone:NO];
         }
@@ -140,6 +163,8 @@
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     FeedTableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"Cell" forIndexPath:indexPath];
 
+    cell.lblPlate.hidden = NO;
+    
     Report *report = [_arrayReports objectAtIndex:indexPath.row];
     
     cell.lblCategory.text = report.category.text;
@@ -147,8 +172,13 @@
     cell.lblPlate.layer.cornerRadius = 3;
     cell.lblPlate.clipsToBounds = YES;
     
+    if ([report.plate  isEqual: @""]) {
+        cell.lblPlate.hidden = YES;
+    }
+
+    
     cell.lblDate.text = [self formatDate:report.createdAt withFormat:@"dd/MM/yyyy"];
-    cell.lblHour.text = [self formatDate:report.createdAt withFormat:@"hh:mm"];
+    cell.lblHour.text = [self formatDate:report.createdAt withFormat:@"HH:mm"];
     [cell.viewPostIcon setBackgroundColor:[UIColor colorWithRed:238.0/255.0 green:45.0/255.0 blue:100.0/255.0 alpha: 1]];
     cell.viewPostIcon.layer.cornerRadius = cell.viewPostIcon.frame.size.width / 2;
     cell.viewPostIcon.clipsToBounds = YES;
@@ -182,7 +212,8 @@
 
     [self.tableView reloadData];
 }
-
+- (IBAction)backInappropriate:(UIStoryboardSegue *)sender {
+}
 
 -(void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     Report *report = [_arrayReports objectAtIndex:indexPath.row];
@@ -194,11 +225,32 @@
     [self performSegueWithIdentifier:@"configSegue" sender:self];
 }
 
-// In a storyboard-based application, you will often want to do a little preparation before navigation
+- (IBAction)optionButton:(id)sender {
+    CGPoint switchPositionPoint = [sender convertPoint:CGPointZero toView:[self tableView]];
+    NSIndexPath *indexPath = [[self tableView] indexPathForRowAtPoint:switchPositionPoint];
+    
+    Report *report = [_arrayReports objectAtIndex:indexPath.row];
+    reportSelected = report.objectId;
+
+    UIActionSheet *actionButtonActionSheet = [[UIActionSheet alloc] initWithTitle:nil
+                                                                        delegate:self
+                                                               cancelButtonTitle:@"Cancelar"
+                                                          destructiveButtonTitle:nil
+                                                               otherButtonTitles:@"Reportar abuso", nil];
+    [actionButtonActionSheet showInView:self.view];
+}
+- (void)actionSheet:(UIActionSheet *)actionSheet clickedButtonAtIndex:(NSInteger)buttonIndex {
+    if (buttonIndex == 0) {
+        [self performSegueWithIdentifier:@"inappropriateSegue" sender:nil];
+    }
+}
 - (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender {
     if ([segue.identifier isEqualToString:@"segueDetail"]) {
         DetailViewController *detailViewController = [segue destinationViewController];
         detailViewController.report = _selectedReport;
+    } else if ([segue.identifier isEqualToString:@"inappropriateSegue"]) {
+        InappropriateViewController *ivc = segue.destinationViewController;
+        ivc.reportID = reportSelected;
     }
 }
 

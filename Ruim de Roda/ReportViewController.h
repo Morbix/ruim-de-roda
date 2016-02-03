@@ -16,12 +16,15 @@
 @interface ReportViewController : UIViewController <UIApplicationDelegate,CLLocationManagerDelegate,MKMapViewDelegate,UITextFieldDelegate>
 
 @property UIImage *imageReport;
+@property (weak, nonatomic) IBOutlet UIActivityIndicatorView *activityIndicator;
+@property (weak, nonatomic) IBOutlet UIView *postingVIew;
 
 @property (weak, nonatomic) IBOutlet UIImageView *reportImage;
 @property (weak, nonatomic) IBOutlet MKMapView *mapView;
 @property (weak, nonatomic) IBOutlet UILabel *addressLabel;
 @property (weak, nonatomic) IBOutlet UILabel *categoryText;
 @property (weak, nonatomic) IBOutlet UITextField *plateText;@property UIImage *imageCrop;
+@property (weak, nonatomic) IBOutlet UIButton *btnCategory;
 
 @property (nonatomic) UIViewController *sourceVC;
 

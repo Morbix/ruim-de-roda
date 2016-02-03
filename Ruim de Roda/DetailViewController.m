@@ -9,8 +9,9 @@
 #import "DetailViewController.h"
 #import "UIImageView+UIActivityIndicatorForSDWebImage.h"
 #import "UIImageView+WebCache.h"
+#import "InappropriateViewController.h"
 
-@interface DetailViewController ()
+@interface DetailViewController () <UIActionSheetDelegate>
 @property (weak, nonatomic) IBOutlet UILabel *lblAddress;
 
 @end
@@ -23,14 +24,14 @@
     
     [self loadData];
     [self.map setDelegate:self];
-
 }
 
-
 -(void) loadData {
-    
     if (_report) {
         
+        if ([_report.plate  isEqual: @""]) {
+            _lblPlate.hidden = YES;
+        }
         
         _lblCategory.text = _report.category.text;
         _lblPlate.text = _report.plate;
@@ -38,7 +39,7 @@
         _lblPlate.clipsToBounds = YES;
         _lblAddress.text = _report.address;
         _lblDate.text = [self formatDate:_report.createdAt withFormat:@"dd/MM/yyyy"];
-        _lblHour.text = [self formatDate:_report.createdAt withFormat:@"hh:mm"];
+        _lblHour.text = [self formatDate:_report.createdAt withFormat:@"HH:mm"];
         [_imgPhoto setImageWithURL:[NSURL URLWithString:_report.photo]  placeholderImage:[UIImage imageNamed:@"placeholder"] usingActivityIndicatorStyle:UIActivityIndicatorViewStyleWhiteLarge];
         
         MapAnnotation * pin = [[MapAnnotation alloc] init];
@@ -51,10 +52,7 @@
         // zoom the map into the users current location
           MKCoordinateRegion viewRegion = MKCoordinateRegionMakeWithDistance(pin.coordinate, 6*METERS_MILE, 6*METERS_MILE);
          [[self map] setRegion:viewRegion animated:YES];
-        
-        
     }
-    
 }
 
 - (void)didReceiveMemoryWarning {
@@ -62,30 +60,13 @@
     // Dispose of any resources that can be recreated.
 }
 
-/*
-#pragma mark - Navigation
-
-// In a storyboard-based application, you will often want to do a little preparation before navigation
-- (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender {
-    // Get the new view controller using [segue destinationViewController].
-    // Pass the selected object to the new view controller.
-}
-*/
-
 - (void) addPins {
-    
     for (MapAnnotation * pin in _locations) {
-        
         [self.map addAnnotation:pin];
-
     }
-    
 }
-
 
 -(NSString*) formatDate: (NSDate*)date withFormat:(NSString*)format {
-    
-    
     NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
     dateFormatter = [[NSDateFormatter alloc] init];
     [dateFormatter setDateFormat:format];// here set format which you want...
@@ -93,6 +74,29 @@
     NSString *convertedString = [dateFormatter stringFromDate:date];
     
     return convertedString;
+}
+- (IBAction)reportOption:(id)sender {
+    UIActionSheet *actionButtonActionSheet = [[UIActionSheet alloc] initWithTitle:nil
+                                                                         delegate:self
+                                                                cancelButtonTitle:@"Cancelar"
+                                                           destructiveButtonTitle:nil
+                                                                otherButtonTitles:@"Reportar abuso", nil];
+    [actionButtonActionSheet showInView:self.view];
+}
+- (void)actionSheet:(UIActionSheet *)actionSheet clickedButtonAtIndex:(NSInteger)buttonIndex {
+    if (buttonIndex == 0) {
+        [self performSegueWithIdentifier:@"detailInappropriated" sender:nil];
+    }
+}
+
+- (IBAction)backInappropriate:(UIStoryboardSegue *)sender {
+}
+
+- (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender {
+    if ([segue.identifier isEqualToString:@"detailInappropriated"]) {
+        InappropriateViewController *ivc = segue.destinationViewController;
+        ivc.reportID = _report.objectId;
+    }
 }
 
 @end
